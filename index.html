@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BMI Calculator Client</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --accent-hover: #0ea5e9;
+        --border: #334155;
+        --error: #f87171;
+        --success: #4ade80;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .card {
+        background-color: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 28px;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      }
+
+      h1 {
+        font-size: 1.4rem;
+        margin-bottom: 6px;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-bottom: 22px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+
+      label {
+        display: block;
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+        color: #e2e8f0;
+      }
+
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background-color: #0f172a;
+        color: var(--text);
+        font-size: 1rem;
+        outline: none;
+      }
+
+      input:focus {
+        border-color: var(--accent);
+      }
+
+      button {
+        width: 100%;
+        padding: 11px;
+        border: none;
+        border-radius: 8px;
+        background-color: var(--accent);
+        color: #0f172a;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      button:hover:not(:disabled) {
+        background-color: var(--accent-hover);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .result-box {
+        margin-top: 20px;
+        padding: 14px;
+        border-radius: 8px;
+        background-color: #0f172a;
+        border: 1px solid var(--border);
+        display: none;
+      }
+
+      .result-box.visible {
+        display: block;
+      }
+
+      .status {
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      .status.error {
+        color: var(--error);
+      }
+
+      .status.success {
+        color: var(--success);
+      }
+
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: Consolas, Monaco, monospace;
+        font-size: 0.9rem;
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>BMI Calculator</h1>
+      <form id="bmiForm">
+        <div class="form-group">
+          <label for="weight">Weight (kg)</label>
+          <input
+            type="number"
+            id="weight"
+            name="weight"
+            step="any"
+            min="0.1"
+            value="45"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="height">Height (m)</label>
+          <input
+            type="number"
+            id="height"
+            name="height"
+            step="any"
+            min="0.1"
+            value="1.68"
+            required
+          />
+        </div>
+
+        <button type="submit" id="submitBtn">Calculate BMI</button>
+      </form>
+
+      <div id="resultBox" class="result-box">
+        <div id="statusText" class="status"></div>
+        <pre id="responseOutput"></pre>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE_URL = "http://127.0.0.1:8001/calculate_bmi";
+
+      const form = document.getElementById("bmiForm");
+      const submitBtn = document.getElementById("submitBtn");
+      const resultBox = document.getElementById("resultBox");
+      const statusText = document.getElementById("statusText");
+      const responseOutput = document.getElementById("responseOutput");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const weight = parseFloat(document.getElementById("weight").value);
+        const height = parseFloat(document.getElementById("height").value);
+
+        if (
+          Number.isNaN(weight) ||
+          Number.isNaN(height) ||
+          weight <= 0 ||
+          height <= 0
+        ) {
+          showMessage(
+            "Please enter valid positive numbers for weight and height.",
+            "error",
+            "",
+          );
+          return;
+        }
+
+        const url = new URL(API_BASE_URL);
+        url.searchParams.set("weight", weight);
+        url.searchParams.set("height", height);
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Calculating...";
+        showMessage(`Requesting: ${url.toString()}`, "", "Loading...");
+
+        try {
+          const response = await fetch(url.toString(), {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+            },
+          });
+
+          const contentType = response.headers.get("content-type") || "";
+          const data = contentType.includes("application/json")
+            ? await response.json()
+            : await response.text();
+
+          if (!response.ok) {
+            showMessage(
+              `HTTP Error ${response.status} (${response.statusText})`,
+              "error",
+              typeof data === "string" ? data : JSON.stringify(data, null, 2),
+            );
+            return;
+          }
+
+          const formatted =
+            typeof data === "string" ? data : JSON.stringify(data, null, 2);
+
+          showMessage("Response received successfully", "success", formatted);
+        } catch (error) {
+          showMessage(
+            "Network or CORS error. Check if the FastAPI server is running on port 8001 and CORS is enabled.",
+            "error",
+            error.message,
+          );
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Calculate BMI";
+        }
+      });
+
+      function showMessage(status, type, output) {
+        resultBox.classList.add("visible");
+        statusText.textContent = status;
+        statusText.className = "status" + (type ? ` ${type}` : "");
+        responseOutput.textContent = output;
+      }
+    </script>
+  </body>
+</html>
